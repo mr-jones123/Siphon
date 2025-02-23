@@ -4,11 +4,12 @@ st.title("🗿 Siphon")
 st.subheader("Accuracy at best. For free.")
 st.caption("Made by xy.")
 st.write("""
-        Siphon is your ultimate AI study buddy. You can use two versions of Siphon: \n
+        Siphon is your ultimate all-in-one AI study buddy. You can use two versions of Siphon: \n
         
          1. chat: An LLM chatbot that is fine-tuned to help you study Computer Science concepts.
          2. rag: An AI that answers intelligently and accurately by uploading your source material to it.
     """)
+
 st.divider()
 st.subheader("Frequently Asked Questions")
 st.markdown("""

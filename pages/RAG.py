@@ -1,84 +1,76 @@
 import streamlit as st
 import os
-from dotenv import load_dotenv
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
-from langchain.chains.llm import LLMChain
-from langchain.chains.combine_documents.stuff import StuffDocumentsChain
-from langchain.chains import RetrievalQA
+from langchain.chains import ConversationalRetrievalChain
 
-load_dotenv()
 
 # App title
 st.set_page_config(page_title="Siphon", page_icon="🗿")
+st.title("Siphon Knowledge")
+st.write("**Siphon Knowledge uses Retrieval Augmented Generation to give accurate and fast results!**")
+st.session_state.gemini_api_key = st.text_input("Enter Gemini API",type="password")
 
-def load_and_split_documents(uploaded_file):
-    # Save the uploaded file temporarily
-    temp_file_path = "temp.pdf"
-    with open(temp_file_path, "wb") as f:
-        f.write(uploaded_file.getvalue())
-    
-    # Use PDFPlumberLoader to load the PDF
-    loader = PDFPlumberLoader(temp_file_path)
-    documents = loader.load()
-    
-    # Clean up the temporary file
-    os.remove(temp_file_path)
+def load_and_split_documents(uploaded_files):
+    all_docs = []
+    for uploaded_file in uploaded_files:
+        temp_file_path = f"temp_{uploaded_file.name}"
+        with open(temp_file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+        
+        loader = PDFPlumberLoader(temp_file_path)
+        docs = loader.load()
+        all_docs.extend(docs)
+        os.remove(temp_file_path)
     
     # Split the text into smaller chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    split_documents = text_splitter.split_documents(documents)
-    
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, add_start_index=True)
+    split_documents = text_splitter.split_documents(all_docs)
     return split_documents
 
 @st.cache_data
-def create_vector_store(_documents):
-    # Use a faster embedding model
+def createVectorStore(_documents):
+    # turns documents into embeddings and stores in a vector (FAISS)
     embedder = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     vector = FAISS.from_documents(_documents, embedder)
-    return vector
+    retriever = vector.as_retriever(search_type = "similarity", search_kwargs={"k" : 1})
+    return retriever
+    
+def processDocuments():
+    splittedDocuments = load_and_split_documents(st.session_state.sourceDocs)
+    st.session_state.retriever = createVectorStore(splittedDocuments)
 
-st.title("Siphon Knowledge")
-st.write("**Siphon Knowledge uses Retrieval Augmented Generation to give accurate results!**")
-st.link_button("Learn about RAG here", "https://www.ibm.com/think/topics/retrieval-augmented-generation")
+def queryLLM(retriever, query):
+    llm = ChatGoogleGenerativeAI(api_key=st.session_state.gemini_api_key, model="gemini-2.0-flash")
+    qa_chain = ConversationalRetrievalChain.from_llm( 
+        llm=llm,
+        retriever=retriever,
+        return_source_documents=True  
+    )
+    result = qa_chain({'question' : query, 'chat_history' : st.session_state.messages})
+    result = result['answer']
+    st.session_state.messages.append((query, result))
+    return result
 
-uploaded_file = st.file_uploader("Upload your material here", type="pdf")
+def appStart():
+    st.session_state.sourceDocs = st.file_uploader("Upload your material here", type="pdf", accept_multiple_files=True)
+    st.button("Submit Documents", on_click=processDocuments)
 
-if uploaded_file is not None:
-    st.success("PDF uploaded successfully!")
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    with st.spinner("📚 Splitting the document into chunks..."):
-        documents = load_and_split_documents(uploaded_file)
+    for message in st.session_state.messages:
+        st.chat_message('human').write(message[0])
+        st.chat_message('ai').write(message[1])    
 
-    with st.spinner("🔍 Creating vector store..."):
-        vector = create_vector_store(documents)
-        retriever = vector.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+    if query := st.chat_input():
+        st.chat_message("human").write(query)
+        response = queryLLM(st.session_state.retriever, query)
+        st.chat_message("ai").write(response)
 
-    # Initialize LLM
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
 
-    prompt = """
-    Use the following context to answer the question. Make sure you base your answer on the context and nothing but the context.
-    Context: {context}
-    Question: {question}
-    Answer:"""
-    QA_PROMPT = PromptTemplate.from_template(prompt)
-
-    user_input = st.chat_input("Ask a question about your document:")
-    if user_input:
-        with st.spinner("🤖 Generating response..."):
-            llm_chain = LLMChain(llm=llm, prompt=QA_PROMPT)
-            combine_documents_chain = StuffDocumentsChain(llm_chain=llm_chain, document_variable_name="context")
-            qa = RetrievalQA(combine_documents_chain=combine_documents_chain, retriever=retriever)
-            result = qa(user_input)
-            query = result["query"]
-            response = result["result"]
-
-        st.write("**Query:**")
-        st.write(query)
-        st.write("**Response:**")
-        st.write(response)
+if __name__ == '__main__':
+    appStart()
