@@ -2,11 +2,21 @@ import { Search, BookOpen, Database, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 // import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-// import Link from "next/link"
+
+
+// import { ProtectedPageLink } from "@/components/auth/ProtectedPageLink"
+
+
 
 export default function Home() {
+
   return (
     <div className="min-h-screen">
+      {/* Header with Auth */}
+      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <h2 className="font-mono font-semibold text-xl">Siphon</h2>
+      </div>
+      
       {/* Hero Section */}
       <header className="container mx-auto px-4 py-16 md:py-24">
         <div className="flex flex-col items-center text-center space-y-6">
@@ -96,16 +106,14 @@ export default function Home() {
         <div className="max-w-2xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-semibold mb-6">Ready to supercharge your research?</h2>
           <p className="text-xl mb-8">
-            Join thousands of CS students who are using Siphon to find the best resources for their papers.
+            Build the foundations of your paper with Siphon.
           </p>
-          {/* <Link href={"/chat"}>
-            <Button size="lg" className="h-12 px-8">
-              <Zap className="mr-2 h-5 w-5" /> Try Siphon Now
-            </Button>
-          </Link> */}
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Button size="lg" className="h-12 px-8">
               <Zap className="mr-2 h-5 w-5" /> Coming Soon
             </Button>
+            {/* <ProtectedPageLink /> */}
+          </div>
         </div>
       </section>
 
@@ -119,3 +127,4 @@ export default function Home() {
     </div>
   )
 }
+
